@@ -1,7 +1,9 @@
 # V language support for Visual Studio Code
 
 [![Version](https://img.shields.io/visual-studio-marketplace/v/vlanguage.vscode-vlang.svg)](https://marketplace.visualstudio.com/items?itemName=vlanguage.vscode-vlang)
+
 <!-- [![Installs](https://img.shields.io/visual-studio-marketplace/downloads/vlanguage.vscode-vlang.svg)](https://marketplace.visualstudio.com/items?itemName=vlanguage.vscode-vlang) -->
+
 [![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/vlang/vscode-vlang/ci.yml?branch=master)](https://github.com/vlang/vscode-vlang/actions/)
 
 Provides [V language](https://vlang.io) support for Visual Studio Code.
@@ -25,7 +27,7 @@ Alternatively you can install the extension from the [Marketplace][market-ext-li
 Now open any `.v`, `.vsh`, `.vv` file in VS Code.
 
 _Note_: It is recommended to turn `Auto Save` on
-    in Visual Studio Code (`File -> Auto Save`) when using this extension.
+in Visual Studio Code (`File -> Auto Save`) when using this extension.
 
 ## Commands
 
@@ -43,5 +45,6 @@ You can access all of the above commands from the command palette (`Cmd+Shift+P`
 [MIT](./LICENSE)
 
 <!-- Links -->
+
 [vs-code]: https://code.visualstudio.com/
 [market-ext-link]: https://marketplace.visualstudio.com/items?itemName=vlanguage.vscode-vlang

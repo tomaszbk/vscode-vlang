@@ -21,17 +21,18 @@
 		"url": "https://github.com/vlang/vscode-vlang"
 	},
 	"scripts": {
-		"build:base": "esbuild src/extension.ts --bundle --external:vscode --outdir=out --platform=node --target=node22 --format=cjs",
+		"build:base": "esbuild src/extension.ts --bundle --external:vscode --outdir=out --platform=node --target=node24 --format=cjs",
 		"build": "npm run build:base -- --sourcemap",
 		"build:prod": "npm run build:base -- --minify",
 		"watch": "npm run build:base -- --sourcemap --watch",
 		"typecheck": "tsc --noEmit",
 		"lint": "eslint src --ext ts",
 		"lint:md": "markdownlint \"**/*.md\" --ignore CHANGELOG.md",
+		"fmt": "prettier -w .",
 		"test": "npm run typecheck && npm run lint",
 		"vscode:prepublish": "npm run build:prod",
 		"package": "npm run build:prod && vsce package",
-		"test:grammar": "vscode-tmgrammar-test -s source.v -g syntaxes/v.tmLanguage.json -t \"syntaxes/tests/*.v\""
+		"test:grammar": "vscode-tmgrammar-test source.v -g syntaxes/v.tmLanguage.json  syntaxes/tests/*.v"
 	},
 	"keywords": [
 		"V",
@@ -253,16 +254,19 @@
 	"main": "./out/extension.js",
 	"dependencies": {
 		"esbuild": "^0.25.10",
+		"node": "^24.10.0",
 		"vscode-languageclient": "10.0.0-next.15"
 	},
 	"devDependencies": {
-		"@types/node": "22",
+		"@types/node": "24",
 		"@types/vscode": "1.105.0",
 		"@typescript-eslint/eslint-plugin": "^8.46",
 		"@typescript-eslint/parser": "^8.46",
 		"@vscode/vsce": "^3.6.2",
 		"eslint": "^9.37.0",
+		"globals": "^15.9.0",
 		"markdownlint-cli": "^0.45.0",
+		"prettier": "^3.6.2",
 		"typescript": "^5.9.3",
 		"vscode-tmgrammar-test": "~0.1.3"
 	}

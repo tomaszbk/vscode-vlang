@@ -3,10 +3,7 @@
 		"module": "ESNext",
 		"moduleResolution": "bundler",
 		"target": "ES6",
-		"lib": [
-			"ES2022",
-			"DOM"
-		],
+		"lib": ["ES2022", "DOM"],
 		"baseUrl": "src",
 		"outDir": "out",
 		"rootDir": "src",
@@ -25,10 +22,6 @@
 		"sourceMap": false,
 		"stripInternal": true
 	},
-	"include": [
-		"src/**/*.ts"
-	],
-	"exclude": [
-		"node_modules",
-	]
+	"include": ["src/**/*.ts"],
+	"exclude": ["node_modules"]
 }
