@@ -6,10 +6,10 @@ jobs:
   compile-and-package:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-node@v2
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
-          node_version: "12"
+          node-version: "24"
       - name: Install dependencies
         run: npm install
       - name: Compile
@@ -20,10 +20,10 @@ jobs:
   code-style:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-node@v2
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
-          node_version: "12"
+          node_version: "24"
       - name: Install dependencies
         run: npm install
       - name: Run eslint
@@ -32,11 +32,11 @@ jobs:
   grammar-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-node@v2
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
-          node_version: "12"
+          node_version: "24"
       - name: Install dependencies
         run: npm install
       - name: Run grammar tests
-        run: npm run testgrammar
+        run: npm run test:grammar
