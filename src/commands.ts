@@ -1,72 +1,85 @@
-import { window, ProgressLocation } from 'vscode';
-import { execVInTerminal, execVInTerminalOnBG, execV } from './exec';
-import { activateVls, deactivateVls, installVls } from './langserver';
-import { log, outputChannel, vlsOutputChannel } from './debug';
+import { window } from 'vscode';
+import type { LanguageClient } from 'vscode-languageclient/node';
+import { execV, execVInTerminal, execVInTerminalOnBG } from './exec';
 
-/** Run current file. */
+/** Run the currently active V file using `v run`. */
 export async function run(): Promise<void> {
-	const document = window.activeTextEditor.document;
+	const document = window.activeTextEditor?.document;
+	if (!document) {
+		void window.showErrorMessage('No active V file to run.');
+		return;
+	}
+
 	await document.save();
 	const filePath = `"${document.fileName}"`;
-
 	execVInTerminal(['run', filePath]);
 }
 
-/** Format current file. */
+/** Format the currently active V file in-place using `v fmt -w`. */
 export async function fmt(): Promise<void> {
-	const document = window.activeTextEditor.document;
+	const document = window.activeTextEditor?.document;
+	if (!document) {
+		void window.showErrorMessage('No active V file to format.');
+		return;
+	}
+
 	await document.save();
 	const filePath = `"${document.fileName}"`;
-
 	execVInTerminalOnBG(['fmt', '-w', filePath]);
 }
 
-/** Build an optimized executable from current file. */
+/** Build an optimized executable from the current file using `v -prod`. */
 export async function prod(): Promise<void> {
-	const document = window.activeTextEditor.document;
+	const document = window.activeTextEditor?.document;
+	if (!document) {
+		void window.showErrorMessage('No active V file to build.');
+		return;
+	}
+
 	await document.save();
 	const filePath = `"${document.fileName}"`;
-
 	execVInTerminal(['-prod', filePath]);
 }
 
-/** Show version info. */
+/** Show version information of the configured `v` executable. */
 export function ver(): void {
 	execV(['-version'], (err, stdout) => {
 		if (err) {
-			void window.showErrorMessage(
-				'Unable to get the version number. Is V installed correctly?'
-			);
+			void window.showErrorMessage('Unable to get the version number. Is V installed correctly?');
 			return;
 		}
+
 		void window.showInformationMessage(stdout);
 	});
 }
 
-export function updateVls(): void {
-	void installVls(true);
+
+export async function updateVls(cli?: LanguageClient): Promise<void> {
+	// For now, show an informational message. If we had an update mechanism
+	// (download/install), it would be invoked here and possibly restart the client.
+	void window.showInformationMessage('Update VLS: not implemented.');
+	// If a client is provided, optionally restart to pick up a new binary.
+	if (cli) {
+		try {
+			await cli.stop();
+			await cli.start();
+			void window.showInformationMessage('VLS has been restarted after update.');
+		} catch (e) {
+			void window.showErrorMessage('Failed to restart VLS after update.');
+		}
+	}
 }
 
-export function restartVls(): void {
-	window.withProgress({
-		location: ProgressLocation.Notification,
-		cancellable: false,
-		title: 'VLS'
-	}, async (progress) => {
-		progress.report({ message: 'Restarting' });
-		deactivateVls();
-		vlsOutputChannel.clear();
-		await activateVls();
-	}).then(
-		() => {
-			return;
-		},
-		(err) => {
-			log(err);
-			outputChannel.show();
-			void window.showErrorMessage(
-				'Failed restarting VLS. See output for more information.'
-			);
-		}
-	);
+export async function restartVls(cli?: LanguageClient): Promise<void> {
+	if (!cli) {
+		void window.showErrorMessage('VLS client is not running.');
+		return;
+	}
+
+	try {
+		await cli.restart();
+		void window.showInformationMessage('VLS restarted successfully.');
+	} catch (e) {
+		void window.showErrorMessage('Failed to restart VLS.');
+	}
 }

@@ -1,8 +1,8 @@
 import {
+	Uri,
+	window,
 	workspace,
 	WorkspaceConfiguration,
-	window,
-	Uri,
 	WorkspaceFolder,
 } from 'vscode';
 const defaultCommand = 'v';

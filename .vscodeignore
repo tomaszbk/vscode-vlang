@@ -10,4 +10,38 @@ images/
 .go
 tsconfig.json
 package-lock.json
-scripts/
+
+# build info
+tsconfig.json
+tsconfig.*.json
+tsconfig.tsbuildinfo
+
+# source files
+src/**
+node_modules/**
+     
+
+# configuration and metadata
+.vscode/**
+.github/**
+.eslintrc*
+.eslintignore
+.prettierrc*
+.prettierignore
+
+# test and CI
+tests/**
+test/**
+**/tests
+**/*.spec.*
+**/*.test.*
+coverage/**
+.vscode-test/**
+*.vsix
+.vscodeignore
+
+# misc
+.gitignore
+.editorconfig
+.yarn*
+*.log

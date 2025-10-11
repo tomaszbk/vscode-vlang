@@ -6,3 +6,14 @@ out/
 *.vsix
 *.tmp.json
 .DS_Store
+
+#MacOS
+.DS_Store
+*.dSYM/
+
+
+#Node
+**/node_modules/
+**/out/
+**/*.tsbuildinfo
+**/*.vsix
