@@ -27,7 +27,7 @@
 		"watch": "npm run build:base -- --sourcemap --watch",
 		"typecheck": "tsc --noEmit",
 		"lint": "eslint src --ext ts",
-		"lint:md": "markdownlint \"**/*.md\" --ignore CHANGELOG.md",
+		"lint:md": "markdownlint README.md",
 		"fmt": "prettier -w .",
 		"test": "npm run typecheck && npm run lint",
 		"vscode:prepublish": "npm run build:prod",

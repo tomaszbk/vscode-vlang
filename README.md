@@ -1,9 +1,6 @@
 # V language support for Visual Studio Code
 
 [![Version](https://img.shields.io/visual-studio-marketplace/v/vlanguage.vscode-vlang.svg)](https://marketplace.visualstudio.com/items?itemName=vlanguage.vscode-vlang)
-
-<!-- [![Installs](https://img.shields.io/visual-studio-marketplace/downloads/vlanguage.vscode-vlang.svg)](https://marketplace.visualstudio.com/items?itemName=vlanguage.vscode-vlang) -->
-
 [![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/vlang/vscode-vlang/ci.yml?branch=master)](https://github.com/vlang/vscode-vlang/actions/)
 
 Provides [V language](https://vlang.io) support for Visual Studio Code.
@@ -48,7 +45,6 @@ Then press `F5` to open a new VS Code window with the extension loaded.
 Open the output console (`Cmd+Shift+U`) to see the debug output from the extension.
 
 Run `Cmd+Shift+P` and select `Preferences: Open User Settings` to update settings.
-
 
 ## License
 

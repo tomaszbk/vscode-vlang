@@ -3,7 +3,7 @@ name: CI
 on: [push, pull_request]
 
 jobs:
-  compile-and-package:
+  build-and-package:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -12,8 +12,8 @@ jobs:
           node-version: "24"
       - name: Install dependencies
         run: npm install
-      - name: Compile
-        run: npm run compile
+      - name: Build
+        run: npm run build
       - name: VSCE package
         run: npm run package
 
