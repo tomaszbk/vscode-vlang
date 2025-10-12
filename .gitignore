@@ -1,18 +1,13 @@
 .vscode/ipch
 *.code-workspace
-node_modules/
-out/
 *.exe
-*.vsix
 *.tmp.json
-.DS_Store
 
-#MacOS
+# MacOS
 .DS_Store
 *.dSYM/
 
-
-#Node
+# Node
 **/node_modules/
 **/out/
 **/*.tsbuildinfo
