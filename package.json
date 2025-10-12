@@ -95,7 +95,7 @@
 			"properties": {
 				"v.vls.command": {
 					"type": "string",
-					"default": "",
+					"default": "v",
 					"description": "Path to the V language server binary."
 				},
 				"v.vls.args": {
@@ -106,6 +106,7 @@
 				"v.executablePath": {
 					"scope": "resource",
 					"type": "string",
+					"default": "v",
 					"description": "Custom path to the V compiler executable (`v`).\nNOTE: Setting this won't change the VROOT path in VLS."
 				},
 				"v.vls.debug": {
@@ -137,11 +138,16 @@
 					"default": true,
 					"description": "Automatically build VLS if it's not found. (Requires V to be installed)"
 				},
-				"v.vls.tmp": {
+				"v.vls.forceCleanInstall": {
 					"scope": "resource",
 					"type": "boolean",
 					"default": false,
-					"description": "Installs vls in /tmp folder"
+					"description": "Removes any existing VLS binary and forces a clean install on startup or vls enabled."
+				},
+				"v.vls.buildPath": {
+					"scope": "resource",
+					"type": "string",
+					"description": "Path to vls source to build."
 				},
 				"v.vls.enableFeatures": {
 					"scope": "resource",

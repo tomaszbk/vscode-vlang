@@ -1,7 +1,7 @@
 import { vlsOutputChannel } from "logger"
 import { commands, ExtensionContext, window } from "vscode"
 import type { LanguageClient } from "vscode-languageclient/node"
-import { execV, execVInTerminal, execVInTerminalOnBG } from "./exec"
+import { execVInTerminal, execVInTerminalOnBG } from "./exec"
 
 /** Run the currently active V file using `v run`. */
 export async function run(): Promise<void> {
@@ -26,7 +26,7 @@ export async function fmt(): Promise<void> {
 
 	await document.save()
 	const filePath = `"${document.fileName}"`
-	execVInTerminalOnBG(["fmt", "-w", filePath])
+	await execVInTerminalOnBG(["fmt", "-w", filePath])
 }
 
 /** Build an optimized executable from the current file using `v -prod`. */
@@ -44,15 +44,8 @@ export async function prod(): Promise<void> {
 
 /** Show version information of the configured `v` executable. */
 export function ver(): void {
-	execV(["-version"], (err, stdout) => {
-		if (err) {
-			void window.showErrorMessage(
-				"Unable to get the version number. Is V installed correctly?",
-			)
-			return
-		}
-
-		void window.showInformationMessage(stdout)
+	execVInTerminalOnBG(["-version"]).catch((err) => {
+		void window.showErrorMessage(`Failed to get V version: ${err}. Is V installed correctly?`)
 	})
 }
 
@@ -97,7 +90,7 @@ export function registerCommands(context: ExtensionContext): Promise<void> {
 	return Promise.resolve()
 }
 
-export function registerVlsCommands(context: ExtensionContext, client: LanguageClient): void {
+export function registerVlsCommands(context: ExtensionContext, client?: LanguageClient): void {
 	context.subscriptions.push(
 		commands.registerCommand("v.vls.update", () => updateVls(client)),
 		commands.registerCommand("v.vls.restart", () => restartVls(client)),

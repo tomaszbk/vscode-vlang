@@ -7,25 +7,24 @@ import { vlsConfig } from "./utils"
 import { exec as _exec } from "child_process"
 import { promises as fs } from "fs"
 import { promisify } from "util"
-import { config } from "utils"
+import { execVInTerminalOnBG } from "./exec"
+import { isVInstalled } from "./utils"
 
 const exec = promisify(_exec)
 
-export const EXTENSION_ROOT_DIR =
-	path.basename(__dirname) === "common"
-		? path.dirname(path.dirname(__dirname))
-		: path.dirname(__dirname)
-
 export const BINARY_NAME = process.platform === "win32" ? "vls.exe" : "vls"
 
-export const DEFAULT_VLS_PATH = config.get<boolean>("tmp")
-	? path.join("/tmp", BINARY_NAME)
-	: path.join(os.homedir(), ".local", "bin", BINARY_NAME) // ~/.local/bin/vls if not tmp enabled
+export const USER_BIN_PATH = path.join(os.homedir(), ".local", "bin")
 
-export async function getVlsPath(): Promise<string> {
-	const build = vlsConfig.get<boolean>("build")
-	if (await isVlsInstalled()) {
-		return DEFAULT_VLS_PATH
+export const VLS_PATH = path.join(USER_BIN_PATH, BINARY_NAME) // ~/.local/bin/vls if not tmp enabled
+
+export async function getVls(): Promise<string> {
+	if (vlsConfig().get<boolean>("forceCleanInstall")) {
+		await fs.rm(VLS_PATH, { recursive: true, force: true })
+		log("forceCleanInstall is enabled, removed existing VLS.")
+	} else if (await isVlsInstalled()) {
+		// dont check if installed if forceCleanInstall is true
+		return VLS_PATH
 	}
 	const selected = await window.showInformationMessage(
 		"VLS is not installed. Do you want to install it now?",
@@ -36,21 +35,21 @@ export async function getVlsPath(): Promise<string> {
 		throw new Error("VLS is required but not installed.")
 	}
 
-	if (!build) {
+	if (!vlsConfig().get<boolean>("build")) {
 		return await installVls()
 	}
 	return await buildVls()
 }
 
 export function isVlsEnabled(): boolean {
-	return vlsConfig.get<boolean>("enable") ?? false
+	return vlsConfig().get<boolean>("enable")
 }
 
 export async function isVlsInstalled(): Promise<boolean> {
 	try {
 		// Check if file exists
-		await fs.access(DEFAULT_VLS_PATH)
-		log(`Using existing VLS at ${DEFAULT_VLS_PATH}`)
+		await fs.access(VLS_PATH)
+		log(`Using existing VLS at ${VLS_PATH}`)
 		return true
 	} catch {
 		// File doesn't exist — ignore and proceed to build/install
@@ -66,24 +65,33 @@ export function installVls(): Promise<string> {
 }
 
 export async function buildVls(): Promise<string> {
-	const tmpDir = "/tmp/vls"
+	if (!(await isVInstalled())) {
+		throw new Error("V must be installed to build VLS.")
+	}
+	let buildPath
 	try {
 		log("Building VLS...")
 		window.showInformationMessage("Building VLS...")
-		await exec(`rm -rf ${tmpDir}`)
-		await exec(`git clone https://github.com/vlang/vls.git ${tmpDir}`)
-		await exec(`cd ${tmpDir} && v .`)
+		if (vlsConfig().get<string>("buildPath") !== "") {
+			buildPath = vlsConfig().get<string>("buildPath")
+		} else {
+			buildPath = "/tmp/vls"
+			await exec(`rm -rf ${buildPath}`)
+			await exec(`git clone https://github.com/vlang/vls.git ${buildPath}`)
+		}
+		await execVInTerminalOnBG(["."], buildPath) // build
 
 		// Ensure target dir exists
-		await fs.mkdir(path.dirname(DEFAULT_VLS_PATH), { recursive: true })
+		await fs.mkdir(path.dirname(VLS_PATH), { recursive: true })
 
 		// Copy binary
-		await exec(`cp ${path.join(tmpDir, BINARY_NAME)} ${DEFAULT_VLS_PATH}`)
+		await exec(`cp ${path.join(buildPath, BINARY_NAME)} ${VLS_PATH}`)
 
-		log(`VLS built and installed at ${DEFAULT_VLS_PATH}`)
-		return DEFAULT_VLS_PATH
+		log(`VLS built and installed at ${VLS_PATH}`)
+		return VLS_PATH
 	} catch (err) {
 		const message = err instanceof Error ? err.message : String(err)
+		log(`Failed to build or install VLS: ${message}`)
 		throw new Error(`Failed to build or install VLS: ${message}`)
 	}
 }

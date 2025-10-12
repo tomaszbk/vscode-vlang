@@ -1,10 +1,16 @@
-import cp, { exec, ExecException } from "child_process"
+import { exec as _exec } from "child_process"
+import { promisify } from "util"
 import { Terminal, window } from "vscode"
-import { getVExecCommand } from "./utils"
-
-type ExecCallback = (error: ExecException | null, stdout: string, stderr: string) => void
+import { config } from "./utils"
 
 let vRunTerm: Terminal | null = null
+
+const exec = promisify(_exec)
+
+// Get V executable command.
+export function getVExecCommand(): string {
+	return config().get<string>("executablePath") //default is v
+}
 
 export function execVInTerminal(args: string[]): void {
 	const vexec = getVExecCommand()
@@ -16,20 +22,9 @@ export function execVInTerminal(args: string[]): void {
 	vRunTerm.sendText(cmd)
 }
 
-export function execVInTerminalOnBG(args: string[]): void {
+export async function execVInTerminalOnBG(args: string[], cwd = "/"): Promise<void> {
 	const vexec = getVExecCommand()
 	const cmd = `${vexec} ${args.join(" ")}`
 
-	cp.exec(cmd)
-}
-
-export function execV(args: string[], callback: ExecCallback): void {
-	const vexec = getVExecCommand()
-	//const cwd = getCwd();
-
-	// void window.showErrorMessage(`Executing ${vexec} ${args.join(" ")} on ${cwd}`);
-
-	exec(`${vexec} ${args.join(" ")}`, (err, stdout, stderr) => {
-		callback(err, stdout, stderr)
-	})
+	await exec(cmd, { cwd })
 }
