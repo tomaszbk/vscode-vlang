@@ -57,12 +57,12 @@
 			{
 				"id": "v",
 				"aliases": [
-					"V"
+					"V",
+					"v"
 				],
 				"extensions": [
 					".v",
-					".vsh",
-					".vv"
+					".vsh"
 				],
 				"configuration": "language-configuration.json"
 			},
@@ -90,6 +90,7 @@
 			}
 		],
 		"configuration": {
+			"type": "object",
 			"title": "V",
 			"properties": {
 				"v.vls.command": {
@@ -130,11 +131,17 @@
 					"default": false,
 					"description": "Enables the language server. (alpha)"
 				},
-				"v.vls.autoBuild": {
+				"v.vls.build": {
 					"scope": "resource",
 					"type": "boolean",
 					"default": true,
 					"description": "Automatically build VLS if it's not found. (Requires V to be installed)"
+				},
+				"v.vls.tmp": {
+					"scope": "resource",
+					"type": "boolean",
+					"default": false,
+					"description": "Installs vls in /tmp folder"
 				},
 				"v.vls.enableFeatures": {
 					"scope": "resource",
@@ -154,7 +161,7 @@
 						"stdio",
 						"tcp"
 					],
-					"description": "Specify the mode to be used when connecting to VLS.",
+					"description": "Specify the mode to be used when connecting to VLS. (Only stdio is working currently)",
 					"enumDescriptions": [
 						"Connects to the language server via standard input/output. (Default)",
 						"Connects to the language server via TCP"
@@ -253,11 +260,10 @@
 	],
 	"main": "./out/extension.js",
 	"dependencies": {
-		"esbuild": "^0.25.10",
-		"node": "^24.10.0",
 		"vscode-languageclient": "10.0.0-next.15"
 	},
 	"devDependencies": {
+		"esbuild": "^0.25.10",
 		"@types/node": "24",
 		"@types/vscode": "1.105.0",
 		"@typescript-eslint/eslint-plugin": "^8.46",
