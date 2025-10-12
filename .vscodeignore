@@ -1,47 +1,43 @@
 .vscode/**
 .vscode-test/**
-node_modules/
-src/
-images/
 
-**/tslint.json
-.gitignore
-.v
-.go
-tsconfig.json
+# Node / npm
+node_modules/
 package-lock.json
 
-# build info
+# Source and build outputs
+src/
+build/
+*.vsix
+
+# TypeScript build artifacts
 tsconfig.json
 tsconfig.*.json
 tsconfig.tsbuildinfo
 
-# source files
-src/**
-node_modules/**
-     
+# Images and bundled assets
+images/
 
-# configuration and metadata
-.vscode/**
-.github/**
-.eslintrc*
-.eslintignore
-.prettierrc*
-.prettierignore
-
-# test and CI
+# Test and CI
 tests/**
 test/**
 **/tests
 **/*.spec.*
 **/*.test.*
 coverage/**
-.vscode-test/**
-*.vsix
-.vscodeignore
 
-# misc
-.gitignore
+# Configuration and metadata
+.github/**
+.eslintrc*
+.eslintignore
+.prettierrc*
+.prettierignore
 .editorconfig
+
+# Misc
+.gitignore
+.v
+.go
 .yarn*
 *.log
+.vscodeignore
