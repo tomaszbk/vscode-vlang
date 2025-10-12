@@ -1,5 +1,6 @@
+import { outputChannel, vlsOutputChannel } from "debug"
 import { getVlsPath } from "langserver"
-import vscode, { ExtensionContext } from "vscode"
+import vscode, { ConfigurationChangeEvent, ExtensionContext, workspace } from "vscode"
 import { LanguageClient, LanguageClientOptions, ServerOptions } from "vscode-languageclient/node"
 import * as commands from "./commands"
 
@@ -23,6 +24,7 @@ export async function activate(context: ExtensionContext): Promise<void> {
 	const clientOptions: LanguageClientOptions = {
 		// Register the server for `v` documents.
 		documentSelector: [{ scheme: "file", language: "v" }],
+		outputChannel: vlsOutputChannel,
 		// Synchronize the 'files' section of settings between client and server.
 		synchronize: {
 			fileEvents: vscode.workspace.createFileSystemWatcher("**/*.v"),
@@ -32,18 +34,48 @@ export async function activate(context: ExtensionContext): Promise<void> {
 	// Create the language client.
 	client = new LanguageClient("vls", "V Language Server", serverOptions, clientOptions)
 
+	workspace.onDidChangeConfiguration(async (e: ConfigurationChangeEvent) => {
+		if (e.affectsConfiguration("v.vls.enable")) {
+			if (workspace.getConfiguration("v.vls").get("enable")) {
+				await client.restart()
+			} else {
+				await client.stop()
+			}
+		} else if (
+			e.affectsConfiguration("v.vls") &&
+			workspace.getConfiguration("v.vls").get("enable")
+		) {
+			void vscode.window
+				.showInformationMessage(
+					"VLS: Restart is required for changes to take effect. Would you like to proceed?",
+					"Yes",
+					"No",
+				)
+				.then(async (selected) => {
+					if (selected == "Yes") {
+						await client.restart()
+					}
+				})
+		}
+	})
+
 	// Register commands and add them to the extension context so they are
 	// disposed automatically when the extension deactivates.
-	context.subscriptions.push(vscode.commands.registerCommand("v.run", commands.run))
-	context.subscriptions.push(vscode.commands.registerCommand("v.fmt", commands.fmt))
-	context.subscriptions.push(vscode.commands.registerCommand("v.ver", commands.ver))
-	context.subscriptions.push(vscode.commands.registerCommand("v.prod", commands.prod))
-	// Pass the language client to commands that need it.
 	context.subscriptions.push(
+		outputChannel,
+		vlsOutputChannel,
+		vscode.commands.registerCommand("v.run", commands.run),
+		vscode.commands.registerCommand("v.fmt", commands.fmt),
+		vscode.commands.registerCommand("v.ver", commands.ver),
+		vscode.commands.registerCommand("v.prod", commands.prod),
+
+		// Pass the language client to commands that need it.
+
 		vscode.commands.registerCommand("v.vls.update", () => commands.updateVls(client)),
-	)
-	context.subscriptions.push(
 		vscode.commands.registerCommand("v.vls.restart", () => commands.restartVls(client)),
+		vscode.commands.registerCommand("v.vls.openOutput", () => {
+			vlsOutputChannel.show()
+		}),
 	)
 
 	// Start the client. This will also launch the server.

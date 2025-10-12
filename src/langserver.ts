@@ -70,6 +70,7 @@ export async function getVlsPath(): Promise<string> {
 	try {
 		// Check if file exists
 		await fs.access(DEFAULT_VLS_PATH)
+		log(`Using existing VLS at ${DEFAULT_VLS_PATH}`)
 		return DEFAULT_VLS_PATH
 	} catch {
 		// File doesn't exist — ignore and proceed to build/install
@@ -81,7 +82,7 @@ export async function getVlsPath(): Promise<string> {
 	}
 	const tmpDir = "/tmp/vls"
 	try {
-		console.log("Building VLS...")
+		log("Building VLS...")
 		await exec(`rm -rf ${tmpDir}`)
 		await exec(`git clone https://github.com/vlang/vls.git ${tmpDir}`)
 		await exec(`cd ${tmpDir} && v .`)
@@ -92,7 +93,7 @@ export async function getVlsPath(): Promise<string> {
 		// Copy binary
 		await exec(`cp ${path.join(tmpDir, "vls")} ${DEFAULT_VLS_PATH}`)
 
-		console.log(`✅ VLS built and installed at ${DEFAULT_VLS_PATH}`)
+		log(`VLS built and installed at ${DEFAULT_VLS_PATH}`)
 		return DEFAULT_VLS_PATH
 	} catch (err) {
 		const message = err instanceof Error ? err.message : String(err)
