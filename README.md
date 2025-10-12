@@ -21,7 +21,7 @@ Provides [V language](https://vlang.io) support for Visual Studio Code.
 
 ## Usage
 
-First you will need to install [Visual Studio Code][vs-code] >= `1.40`.
+First you will need to install [Visual Studio Code][vs-code] >= `1.105`.
 In the command palette (`Cmd+Shift+P`) select `Install Extensions` and choose `V`.
 Alternatively you can install the extension from the [Marketplace][market-ext-link].
 Now open any `.v`, `.vsh`, `.vv` file in VS Code.

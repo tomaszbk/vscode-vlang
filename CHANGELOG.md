@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.2.0
+
+_13 October 2025_
+
+### Features
+
+- ⏫ Update extension to prompt to install v and vls if not found
+- ⏫ Use the new vls (https://github.com/vlang/vls)
+- ⏫ Add syntax support for v.mod files
+
 ## 0.1.14
 
 _1 September 2022_
