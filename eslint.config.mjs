@@ -1,7 +1,7 @@
 import eslint from "@eslint/js"
 import tseslint from "@typescript-eslint/eslint-plugin"
 import tsparser from "@typescript-eslint/parser"
-// import globals from 'globals';
+import globals from "globals"
 
 export default [
 	{
@@ -17,9 +17,9 @@ export default [
 				projectService: true,
 				tsconfigRootDir: import.meta.dirname,
 			},
-			// globals: {
-			// 	...globals.node,
-			// },
+			globals: {
+				...globals.node,
+			},
 		},
 		plugins: {
 			"@typescript-eslint": tseslint,
