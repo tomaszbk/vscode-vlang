@@ -40,6 +40,16 @@ in Visual Studio Code (`File -> Auto Save`) when using this extension.
 
 You can access all of the above commands from the command palette (`Cmd+Shift+P`).
 
+## Debug the extension
+
+Clone this repository and run `npm install` to install the dependencies.
+Then press `F5` to open a new VS Code window with the extension loaded.
+
+Open the output console (`Cmd+Shift+U`) to see the debug output from the extension.
+
+Run `Cmd+Shift+P` and select `Preferences: Open User Settings` to update settings.
+
+
 ## License
 
 [MIT](./LICENSE)
