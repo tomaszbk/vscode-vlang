@@ -1,4 +1,5 @@
-import { window } from "vscode"
+import { vlsOutputChannel } from "logger"
+import { commands, ExtensionContext, window } from "vscode"
 import type { LanguageClient } from "vscode-languageclient/node"
 import { execV, execVInTerminal, execVInTerminalOnBG } from "./exec"
 
@@ -84,4 +85,24 @@ export async function restartVls(cli?: LanguageClient): Promise<void> {
 	} catch {
 		void window.showErrorMessage("Failed to restart VLS.")
 	}
+}
+
+export function registerCommands(context: ExtensionContext): Promise<void> {
+	context.subscriptions.push(
+		commands.registerCommand("v.run", run),
+		commands.registerCommand("v.fmt", fmt),
+		commands.registerCommand("v.ver", ver),
+		commands.registerCommand("v.prod", prod),
+	)
+	return Promise.resolve()
+}
+
+export function registerVlsCommands(context: ExtensionContext, client: LanguageClient): void {
+	context.subscriptions.push(
+		commands.registerCommand("v.vls.update", () => updateVls(client)),
+		commands.registerCommand("v.vls.restart", () => restartVls(client)),
+		commands.registerCommand("v.vls.openOutput", () => {
+			vlsOutputChannel.show()
+		}),
+	)
 }

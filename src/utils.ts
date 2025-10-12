@@ -1,19 +1,15 @@
-import { Uri, window, workspace, WorkspaceConfiguration, WorkspaceFolder } from "vscode"
+import { Uri, window, workspace, WorkspaceFolder } from "vscode"
 const defaultCommand = "v"
+
+export const config = workspace.getConfiguration("v")
+export const vlsConfig = workspace.getConfiguration("v.vls")
 
 /** Get V executable command.
  * Will get from user setting configuration first.
  * If user don't specify it, then get default command
  */
 export function getVExecCommand(): string {
-	const config = getWorkspaceConfig()
-	return config.get("v.executablePath", defaultCommand)
-}
-
-/** Get V configuration. */
-export function getWorkspaceConfig(): WorkspaceConfiguration {
-	const currentWorkspaceFolder = getWorkspaceFolder()
-	return workspace.getConfiguration("v", currentWorkspaceFolder.uri)
+	return config.get<string>("executablePath", defaultCommand)
 }
 
 /** Get current working directory.
