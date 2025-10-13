@@ -75,17 +75,20 @@ export async function buildVls(): Promise<string> {
 		if (vlsConfig().get<string>("buildPath") !== "") {
 			buildPath = vlsConfig().get<string>("buildPath")
 		} else {
-			buildPath = "/tmp/vls"
-			await exec(`rm -rf ${buildPath}`)
-			await exec(`git clone https://github.com/vlang/vls.git ${buildPath}`)
+			// Use temporary directory for cross-platform compatibility
+			buildPath = path.join(os.tmpdir(), "vls")
+			// Remove any existing directory at buildPath
+			await fs.rm(buildPath, { recursive: true, force: true })
+			// Clone the repo into buildPath
+			await exec(`git clone --depth 1 https://github.com/vlang/vls.git ${buildPath}`)
 		}
 		await execVInTerminalOnBG(["."], buildPath) // build
 
 		// Ensure target dir exists
 		await fs.mkdir(path.dirname(VLS_PATH), { recursive: true })
 
-		// Copy binary
-		await exec(`cp ${path.join(buildPath, BINARY_NAME)} ${VLS_PATH}`)
+		// Copy binary using Node fs to support Windows
+		await fs.copyFile(path.join(buildPath, BINARY_NAME), VLS_PATH)
 
 		log(`VLS built and installed at ${VLS_PATH}`)
 		return VLS_PATH
