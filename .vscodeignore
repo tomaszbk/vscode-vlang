@@ -1,13 +1,43 @@
 .vscode/**
 .vscode-test/**
+
+# Node / npm
 node_modules/
+package-lock.json
+
+# Source and build outputs
 src/
+build/
+*.vsix
+
+# TypeScript build artifacts
+tsconfig.json
+tsconfig.*.json
+tsconfig.tsbuildinfo
+
+# Images and bundled assets
 images/
 
-**/tslint.json
+# Test and CI
+tests/**
+test/**
+**/tests
+**/*.spec.*
+**/*.test.*
+coverage/**
+
+# Configuration and metadata
+.github/**
+.eslintrc*
+.eslintignore
+.prettierrc*
+.prettierignore
+.editorconfig
+
+# Misc
 .gitignore
 .v
 .go
-tsconfig.json
-package-lock.json
-scripts/
+.yarn*
+*.log
+.vscodeignore

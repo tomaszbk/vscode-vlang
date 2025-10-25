@@ -1,52 +1,119 @@
-import vscode, { workspace, ExtensionContext, ConfigurationChangeEvent } from 'vscode';
-import * as commands from './commands';
-import { activateVls, deactivateVls, isVlsEnabled } from './langserver';
+import { registerCommands, registerVlsCommands } from "commands"
+import { getVls, isVlsEnabled } from "langserver"
+import { log, outputChannel, vlsOutputChannel } from "logger"
+import vscode, { ConfigurationChangeEvent, ExtensionContext, workspace } from "vscode"
+import { LanguageClient, LanguageClientOptions, ServerOptions } from "vscode-languageclient/node"
+import { installV, isVInstalled } from "./utils"
 
-const cmds = {
-	'v.run': commands.run,
-	'v.fmt': commands.fmt,
-	'v.ver': commands.ver,
-	'v.prod': commands.prod,
-	'v.vls.update': commands.updateVls,
-	'v.vls.restart': commands.restartVls,
-};
+export let client: LanguageClient | undefined
 
-/**
- * This method is called when the extension is activated.
- * @param context The extension context
- */
-export function activate(context: ExtensionContext): void {
-	for (const cmd in cmds) {
-		const handler = cmds[cmd] as () => void;
-		const disposable = vscode.commands.registerCommand(cmd, handler);
-		context.subscriptions.push(disposable);
+async function createAndStartClient(): Promise<void> {
+	const vlsPath = await getVls()
+
+	const serverOptions: ServerOptions = {
+		run: { command: vlsPath },
+		debug: { command: vlsPath },
 	}
 
-	workspace.onDidChangeConfiguration((e: ConfigurationChangeEvent) => {
-		if (e.affectsConfiguration('v.vls.enable')) {
-			if (isVlsEnabled()) {
-				void activateVls();
-			} else {
-				deactivateVls();
-			}
-		} else if (e.affectsConfiguration('v.vls') && isVlsEnabled()) {
-			void vscode.window.showInformationMessage('VLS: Restart is required for changes to take effect. Would you like to proceed?', 'Yes', 'No')
-				.then(selected => {
-					if (selected == 'Yes') {
-						void vscode.commands.executeCommand('v.vls.restart');
-					}
-				});
-		}
-	});
-
-	const shouldEnableVls = isVlsEnabled();
-	if (shouldEnableVls) {
-		void activateVls();
+	const clientOptions: LanguageClientOptions = {
+		documentSelector: [{ scheme: "file", language: "v" }],
+		outputChannel: vlsOutputChannel,
+		synchronize: {
+			fileEvents: vscode.workspace.createFileSystemWatcher("**/*.v"),
+		},
 	}
+
+	client = new LanguageClient("vls", "V Language Server", serverOptions, clientOptions)
+	vscode.window.showInformationMessage("V Language Server is starting.")
+	await client.start()
+	vscode.window.showInformationMessage("V Language Server is now active.")
 }
 
-export function deactivate(): void {
-	if (isVlsEnabled()) {
-		deactivateVls();
+export async function activate(context: ExtensionContext): Promise<void> {
+	// Register output channels so users can open them even without VLS.
+	context.subscriptions.push(outputChannel, vlsOutputChannel)
+
+	// Check for V only if it's not installed
+	if (!(await isVInstalled())) {
+		const selection = await vscode.window.showInformationMessage(
+			"The V programming language is not detected on this system. Would you like to install it?",
+			{ modal: true }, // Modal makes the user have to choose before continuing
+			"Yes",
+			"No",
+		)
+
+		if (selection === "Yes") {
+			await installV()
+		}
 	}
+
+	// Register commands regardless of whether VLS is enabled
+	await registerCommands(context)
+
+	// Only start the language server if the user enabled it in settings.
+	if (isVlsEnabled()) {
+		try {
+			await createAndStartClient()
+		} catch (err) {
+			// If starting the client fails, log and continue. Users can still
+			// use non-LSP features of the extension.
+			console.error("Failed to start VLS:", err)
+			vscode.window.showErrorMessage("Failed to start VLS. See output for details.")
+			outputChannel.show()
+		}
+	} else {
+		log("VLS is disabled in settings.")
+	}
+
+	registerVlsCommands(context, client)
+
+	// React to configuration changes: enable/disable or request restart.
+	workspace.onDidChangeConfiguration(async (e: ConfigurationChangeEvent) => {
+		const vlsEnabled = isVlsEnabled()
+
+		if (e.affectsConfiguration("v.vls.enable")) {
+			if (vlsEnabled && !client) {
+				// Start the client now that the user enabled it.
+				try {
+					await createAndStartClient()
+				} catch (err) {
+					console.error("Failed to start VLS:", err)
+					vscode.window.showErrorMessage("Failed to start VLS. See output for details.")
+					outputChannel.show()
+				}
+			} else if (!vlsEnabled && client) {
+				// Stop the client if it was running and the user disabled it.
+				try {
+					await client.stop()
+					log("VLS has been stopped.")
+				} catch {
+					// ignore
+				}
+				client = undefined
+			}
+		} else if (e.affectsConfiguration("v.vls") && vlsEnabled && client) {
+			void vscode.window
+				.showInformationMessage(
+					"VLS: Restart is required for changes to take effect. Would you like to proceed?",
+					"Yes",
+					"No",
+				)
+				.then(async (selected) => {
+					if (selected == "Yes") {
+						try {
+							if (client) {
+								await client.restart()
+							}
+						} catch {
+							void vscode.window.showErrorMessage("Failed to restart VLS.")
+						}
+					}
+				})
+		}
+	})
+}
+
+export function deactivate(): Promise<void> | undefined {
+	if (!client) return undefined
+	return client.stop()
 }

@@ -1,251 +1,100 @@
-import cp from 'child_process';
-import * as net from 'net';
-import { window, workspace, ProgressLocation, Disposable } from 'vscode';
-import { LanguageClient, LanguageClientOptions, StreamInfo, ServerOptions, CloseAction, ErrorAction } from 'vscode-languageclient/node';
-import { terminate } from 'vscode-languageclient/lib/node/processes';
+import * as os from "os"
+import * as path from "path"
+import { window } from "vscode"
+import { log } from "./logger"
+import { vlsConfig } from "./utils"
 
-import { getVExecCommand, getWorkspaceConfig } from './utils';
-import { log, outputChannel, vlsOutputChannel } from './debug';
-import { once } from 'events';
+import { exec as _exec } from "child_process"
+import { promises as fs } from "fs"
+import { promisify } from "util"
+import { execVInTerminalOnBG } from "./exec"
+import { isVInstalled } from "./utils"
 
-export let client: LanguageClient;
-export let clientDisposable: Disposable;
+const exec = promisify(_exec)
 
-let crashCount = 0;
-let vlsProcess: cp.ChildProcess;
+export const BINARY_NAME = process.platform === "win32" ? "vls.exe" : "vls"
 
-const vexe = getVExecCommand();
-const defaultLauncherArgs: string[] = ['--json'];
+export const USER_BIN_PATH = path.join(os.homedir(), ".local", "bin")
 
-function spawnLauncher(...args: string[]): cp.ChildProcess {
-	const finalArgs: string[] = ['ls'].concat(...defaultLauncherArgs).concat(...args);
-	log(`Spawning v ${finalArgs.join(' ')}...`);
-	return cp.spawn(vexe, finalArgs, {shell: true});
-}
+export const VLS_PATH = path.join(USER_BIN_PATH, BINARY_NAME) // ~/.local/bin/vls if not tmp enabled
 
-export async function checkVlsInstallation(): Promise<boolean> {
-	const vlsInstalled = await isVlsInstalled();
-	if (!vlsInstalled) {
-		const selected = await window.showInformationMessage('VLS is not installed. Do you want to install it now?', 'Yes', 'No');
-		if (selected === 'Yes') {
-			await installVls();
-			return await isVlsInstalled();
-		} else {
-			return false;
-		}
+export async function getVls(): Promise<string> {
+	if (vlsConfig().get<boolean>("forceCleanInstall")) {
+		await fs.rm(VLS_PATH, { recursive: true, force: true })
+		log("forceCleanInstall is enabled, removed existing VLS.")
+	} else if (await isVlsInstalled()) {
+		// dont check if installed if forceCleanInstall is true
+		return VLS_PATH
 	}
-	return true;
-}
+	const selected = await window.showInformationMessage(
+		"VLS is not installed. Do you want to install it now?",
+		"Yes",
+		"No",
+	)
+	if (selected === "No") {
+		throw new Error("VLS is required but not installed.")
+	}
 
-function receiveLauncherJsonData(cb: (d: { error?: { code: number, message: string }, message: string }) => void) {
-	return (rawData: string | Buffer) => {
-		const data = typeof rawData == 'string' ? rawData : rawData.toString('utf8');
-		const escapedData: string = data.replace(/\\/g, '/'); // replace backslashes found in Windows paths to prevent JSON parsing errors, TODO: proper JSON escaping solution needed
-		log(`[v ls] new data: ${data}\tescaped: ${escapedData}`);
-		cb(JSON.parse(escapedData));
-	};
-}
-
-function receiveLauncherError(rawData: string | Buffer) {
-	const msg = typeof rawData === 'string' ? rawData : rawData.toString('utf8');
-	const launcherMessage = `[v ls] error: ${msg}`;
-	log(launcherMessage);
-	void window.showErrorMessage(launcherMessage);
-}
-
-export async function isVlsInstalled(): Promise<boolean> {
-	let isInstalled = false;
-	const launcher = spawnLauncher('--check');
-
-	launcher.stdout.on('data', receiveLauncherJsonData(({ error, message }) => {
-		if (error) {
-			void window.showErrorMessage(`Error (${error.code}): ${error.message}`);
-		} else if (!message.includes('not installed')) {
-			isInstalled = true;
-		}
-	}));
-
-	launcher.stderr.on('data', receiveLauncherError);
-	await once(launcher, 'close');
-	return isInstalled;
+	if (!vlsConfig().get<boolean>("build")) {
+		return await installVls()
+	}
+	return await buildVls()
 }
 
 export function isVlsEnabled(): boolean {
-	return getWorkspaceConfig().get<boolean>('vls.enable') ?? false;
+	return vlsConfig().get<boolean>("enable")
 }
 
-export async function installVls(update = false): Promise<void> {
+export async function isVlsInstalled(): Promise<boolean> {
 	try {
-		await window.withProgress({
-			location: ProgressLocation.Notification,
-			title: update ? 'Updating VLS' : 'Installing VLS',
-			cancellable: true,
-		}, async (progress, token) => {
-			const launcher = spawnLauncher(update ? '--update' : '--install');
-			token.onCancellationRequested(() => launcher.kill());
+		// Check if file exists
+		await fs.access(VLS_PATH)
+		log(`Using existing VLS at ${VLS_PATH}`)
+		return true
+	} catch {
+		// File doesn't exist — ignore and proceed to build/install
+		return false
+	}
+}
 
-			launcher.stdout.on('data', receiveLauncherJsonData((payload) => {
-				if (payload.error) {
-					void window.showErrorMessage(`Error (${payload.error.code}): ${payload.error.message}`);
-				} else if (payload.message.includes('was updated') || payload.message.includes('was already updated')) {
-					void window.showInformationMessage(payload.message);
-				} else {
-					progress.report(payload);
-				}
-			}));
+export function installVls(): Promise<string> {
+	// TODO: Install latest vls from github once there are releases
+	return Promise.reject(
+		new Error("VLS builds not yet available. Please enable vls.build in settings."),
+	)
+}
 
-			launcher.stderr.on('data', receiveLauncherError);
-			await once(launcher, 'close');
-		});
-	} catch (e) {
-		log(e);
-		outputChannel.show();
-		if (e instanceof Error) {
-			await window.showErrorMessage(e.message);
+export async function buildVls(): Promise<string> {
+	if (!(await isVInstalled())) {
+		throw new Error("V must be installed to build VLS.")
+	}
+	let buildPath
+	try {
+		log("Building VLS...")
+		window.showInformationMessage("Building VLS...")
+		if (vlsConfig().get<string>("buildPath") !== "") {
+			buildPath = vlsConfig().get<string>("buildPath")
 		} else {
-			await window.showErrorMessage('Failed installing VLS. See output for more information.');
+			// Use temporary directory for cross-platform compatibility
+			buildPath = path.join(os.tmpdir(), "vls")
+			// Remove any existing directory at buildPath
+			await fs.rm(buildPath, { recursive: true, force: true })
+			// Clone the repo into buildPath
+			await exec(`git clone --depth 1 https://github.com/vlang/vls.git ${buildPath}`)
 		}
-	}
-}
+		await execVInTerminalOnBG(["."], buildPath) // build
 
-function connectVlsViaTcp(port: number): Promise<StreamInfo> {
-	const socket = net.connect({ port });
-	const result: StreamInfo = {
-		writer: socket,
-		reader: socket
-	};
-	return Promise.resolve(result);
-}
+		// Ensure target dir exists
+		await fs.mkdir(path.dirname(VLS_PATH), { recursive: true })
 
-export function connectVls(): void {
-	let shouldSpawnProcess = true;
+		// Copy binary using Node fs to support Windows
+		await fs.copyFile(path.join(buildPath, BINARY_NAME), VLS_PATH)
 
-	const config = getWorkspaceConfig();
-	const connMode = config.get<string>('vls.connectionMode');
-	const tcpPort = config.get<number>('vls.tcpMode.port');
-
-	// Arguments to be passed to VLS
-	const vlsArgs: string[] = config.get<string>('vls.customArgs').split(' ').filter(Boolean);
-	const hasArg = (flag: string): boolean => vlsArgs.findIndex(a => a == flag || a.startsWith(flag)) != -1;
-	const pushArg = (flags: string[], value?: string | number | boolean) => {
-		if ((typeof value === 'string' && value.length == 0) || value === null) {
-			return;
-		}
-
-		const validFlags = flags.filter(Boolean);
-		if (validFlags.length != 0 && validFlags.every(flag => !hasArg(flag))) {
-			if (typeof value === 'undefined' || (typeof value === 'boolean' && value)) {
-				vlsArgs.push(validFlags[0]);
-			} else {
-				vlsArgs.push(`${validFlags[0]}=${value.toString()}`);
-			}
-		}
-	};
-
-	pushArg(['--enable', '-e'], config.get<string>('vls.enableFeatures'));
-	pushArg(['--disable', '-d'], config.get<string>('vls.disableFeatures'));
-	pushArg(['--vroot'], config.get<string>('vls.customVrootPath'));
-	pushArg(['--debug'], config.get<boolean>('vls.debug'));
-
-	if (connMode == 'tcp') {
-		pushArg(['--socket']);
-		pushArg(['--port'], tcpPort);
-
-		// This will instruct the extension to not skip launching
-		// a new VLS process and use an existing one with TCP enabled instead.
-		if (config.get<boolean>('vls.tcpMode.useRemoteServer')) {
-			shouldSpawnProcess = false;
-		}
-	}
-
-	if (shouldSpawnProcess) {
-		// Kill first the existing VLS process
-		// before launching a new one.
-		killVlsProcess();
-		vlsProcess = spawnLauncher('--ls', ...vlsArgs);
-	}
-
-	const serverOptions: ServerOptions = connMode == 'tcp'
-		? () => connectVlsViaTcp(tcpPort)
-		: () => Promise.resolve(vlsProcess);
-
-	// LSP Client options
-	const clientOptions: LanguageClientOptions = {
-		documentSelector: [{ scheme: 'file', language: 'v' }],
-		synchronize: {
-			fileEvents: workspace.createFileSystemWatcher('**/*.v')
-		},
-		outputChannel: vlsOutputChannel,
-		errorHandler: {
-			closed() {
-				crashCount++;
-				if (crashCount < 5) {
-					return CloseAction.Restart;
-				}
-				return CloseAction.DoNotRestart;
-			},
-			error(err, msg, count) {
-				// taken from: https://github.com/golang/vscode-go/blob/HEAD/src/goLanguageServer.ts#L533-L539
-				if (count < 5) {
-					return ErrorAction.Continue;
-				}
-				void window.showErrorMessage(
-					// eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-					`VLS: Error communicating with the language server: ${err}: ${msg}.`
-				);
-
-				return ErrorAction.Shutdown;
-			}
-		},
-	};
-
-	client = new LanguageClient(
-		'V Language Server',
-		serverOptions,
-		clientOptions,
-		true
-	);
-
-	client.onReady()
-		.then(() => {
-			window.setStatusBarMessage('The V language server is ready.', 3000);
-		})
-		.catch(() => {
-			window.setStatusBarMessage('The V language server failed to initialize.', 3000);
-		});
-
-	// NOTE: the language client was removed in the context subscriptions
-	// because of it's error-handling behavior which causes the progress/message
-	// box to hang and produce unnecessary errors in the output/devtools log.
-	clientDisposable = client.start();
-}
-
-export async function activateVls(): Promise<void> {
-	if (!isVlsEnabled()) return;
-
-	const customVlsPath = getWorkspaceConfig().get<string>('vls.customPath');
-	if (customVlsPath && customVlsPath.trim().length != 0) {
-		defaultLauncherArgs.push('--path');
-		defaultLauncherArgs.push(customVlsPath);
-	}
-
-	const installed = await checkVlsInstallation();
-	if (installed) {
-		connectVls();
-	}
-}
-
-export function deactivateVls(): void {
-	if (client) {
-		clientDisposable.dispose();
-	} else {
-		killVlsProcess();
-	}
-}
-
-export function killVlsProcess(): void {
-	if (vlsProcess && !vlsProcess.killed) {
-		log('Terminating existing VLS process.');
-		terminate(vlsProcess);
+		log(`VLS built and installed at ${VLS_PATH}`)
+		return VLS_PATH
+	} catch (err) {
+		const message = err instanceof Error ? err.message : String(err)
+		log(`Failed to build or install VLS: ${message}`)
+		throw new Error(`Failed to build or install VLS: ${message}`)
 	}
 }

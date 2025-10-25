@@ -4,12 +4,14 @@
 	"description": "V language support (syntax highlighting, formatter, snippets) for Visual Studio Code.",
 	"publisher": "vlanguage",
 	"icon": "icons/icon.png",
-	"version": "0.1.14",
+	"version": "0.2.0",
 	"license": "MIT",
 	"engines": {
-		"vscode": "^1.40.0"
+		"vscode": "^1.105.0"
 	},
-	"extensionPack": ["ms-vscode.cpptools"],
+	"extensionPack": [
+		"ms-vscode.cpptools"
+	],
 	"homepage": "https://vlang.io/",
 	"bugs": {
 		"url": "https://github.com/vlang/vscode-vlang/issues"
@@ -19,15 +21,18 @@
 		"url": "https://github.com/vlang/vscode-vlang"
 	},
 	"scripts": {
-		"compile": "node ./scripts/build.js",
-		"compile-dev": "node ./scripts/build.js --watch",
-		"lint": "eslint .",
-		"lintmd": "markdownlint *.md -i CHANGELOG.md",
-		"vscode:prepublish": "node ./scripts/minify_json.js && cross-env NODE_ENV=production node ./scripts/build.js",
-		"watch": "tsc -watch -p ./",
-		"package": "vsce package",
-		"postpackage": "node ./scripts/minify_json.js --restore",
-		"testgrammar": "vscode-tmgrammar-test -s source.v -g syntaxes/v.tmLanguage.json -t \"syntaxes/tests/*.v\""
+		"build:base": "esbuild src/extension.ts --bundle --external:vscode --outdir=out --platform=node --target=node24 --format=cjs",
+		"build": "npm run build:base -- --sourcemap",
+		"build:prod": "npm run build:base -- --minify",
+		"watch": "npm run build:base -- --sourcemap --watch",
+		"typecheck": "tsc --noEmit",
+		"lint": "eslint src --ext ts",
+		"lint:md": "markdownlint README.md",
+		"fmt": "prettier -w .",
+		"test": "npm run typecheck && npm run lint",
+		"vscode:prepublish": "npm run build:prod",
+		"package": "npm run build:prod && vsce package",
+		"test:grammar": "vscode-tmgrammar-test source.v -g syntaxes/v.tmLanguage.json  syntaxes/tests/*.v"
 	},
 	"keywords": [
 		"V",
@@ -52,30 +57,56 @@
 			{
 				"id": "v",
 				"aliases": [
-					"V"
+					"V",
+					"v"
 				],
 				"extensions": [
 					".v",
-					".vsh",
-					".vv",
+					".vsh"
+				],
+				"configuration": "language-configuration.json"
+			},
+			{
+				"id": "v.mod",
+				"aliases": [
 					"v.mod"
 				],
-				"configuration": "./language-configuration.json"
+				"extensions": [
+					"v.mod"
+				],
+				"configuration": "language-configuration.json"
 			}
 		],
 		"grammars": [
 			{
 				"language": "v",
 				"scopeName": "source.v",
-				"path": "./syntaxes/v.tmLanguage.json"
+				"path": "syntaxes/v.tmLanguage.json"
+			},
+			{
+				"language": "v.mod",
+				"scopeName": "v.mod",
+				"path": "syntaxes/v.mod.tmLanguage.json"
 			}
 		],
 		"configuration": {
+			"type": "object",
 			"title": "V",
 			"properties": {
+				"v.vls.command": {
+					"type": "string",
+					"default": "v",
+					"description": "Path to the V language server binary."
+				},
+				"v.vls.args": {
+					"type": "array",
+					"default": [],
+					"description": "Arguments to pass to the V language server."
+				},
 				"v.executablePath": {
 					"scope": "resource",
 					"type": "string",
+					"default": "v",
 					"description": "Custom path to the V compiler executable (`v`).\nNOTE: Setting this won't change the VROOT path in VLS."
 				},
 				"v.vls.debug": {
@@ -101,6 +132,23 @@
 					"default": false,
 					"description": "Enables the language server. (alpha)"
 				},
+				"v.vls.build": {
+					"scope": "resource",
+					"type": "boolean",
+					"default": true,
+					"description": "Automatically build VLS if it's not found. (Requires V to be installed)"
+				},
+				"v.vls.forceCleanInstall": {
+					"scope": "resource",
+					"type": "boolean",
+					"default": false,
+					"description": "Removes any existing VLS binary and forces a clean install on startup or vls enabled."
+				},
+				"v.vls.buildPath": {
+					"scope": "resource",
+					"type": "string",
+					"description": "Path to vls source to build."
+				},
 				"v.vls.enableFeatures": {
 					"scope": "resource",
 					"type": "string",
@@ -119,7 +167,7 @@
 						"stdio",
 						"tcp"
 					],
-					"description": "Specify the mode to be used when connecting to VLS.",
+					"description": "Specify the mode to be used when connecting to VLS. (Only stdio is working currently)",
 					"enumDescriptions": [
 						"Connects to the language server via standard input/output. (Default)",
 						"Connects to the language server via TCP"
@@ -214,30 +262,24 @@
 		]
 	},
 	"activationEvents": [
-		"workspaceContains:**/*.v",
-		"onLanguage:v",
-		"onCommand:v.run",
-		"onCommand:v.fmt",
-		"onCommand:v.prod",
-		"onCommand:v.ver",
-		"onCommand:v.vls.update",
-		"onCommand:v.vls.restart"
+		"workspaceContains:**/*.v"
 	],
 	"main": "./out/extension.js",
 	"dependencies": {
-		"cross-env": "^7.0.3",
-		"esbuild": "^0.15.7",
-		"vscode-languageclient": "^7.0.0"
+		"vscode-languageclient": "10.0.0-next.15"
 	},
 	"devDependencies": {
-		"@types/node": "12",
-		"@types/vscode": "1.40.0",
-		"@typescript-eslint/eslint-plugin": "^4.33",
-		"@typescript-eslint/parser": "^4.33",
-		"eslint": "^7.32",
-		"markdownlint-cli": "^0.31.1",
-		"typescript": "^4.6.4",
-		"vsce": "^2.7.0",
-		"vscode-tmgrammar-test": "~0.0.11"
+		"esbuild": "^0.25.10",
+		"@types/node": "24",
+		"@types/vscode": "1.105.0",
+		"@typescript-eslint/eslint-plugin": "^8.46",
+		"@typescript-eslint/parser": "^8.46",
+		"@vscode/vsce": "^3.6.2",
+		"eslint": "^9.37.0",
+		"globals": "^15.9.0",
+		"markdownlint-cli": "^0.45.0",
+		"prettier": "^3.6.2",
+		"typescript": "^5.9.3",
+		"vscode-tmgrammar-test": "~0.1.3"
 	}
 }

@@ -6,11 +6,11 @@ jobs:
   markdown-lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-node@v2
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
-          node_version: "12"
+          node-version: "24"
       - name: Install dependencies
         run: npm install
       - name: Check readme linting
-        run: npm run lintmd
+        run: npm run lint:md
