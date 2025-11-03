@@ -161,6 +161,7 @@
 				"v.vls.buildPath": {
 					"scope": "resource",
 					"type": "string",
+					"default": "",
 					"description": "Path to vls source to build."
 				},
 				"v.vls.enableFeatures": {
