@@ -3,10 +3,13 @@ import { getVExecCommand } from "exec"
 import extract from "extract-zip"
 import * as fs from "fs"
 import { log } from "logger"
+import { Readable } from "node:stream"
 import { pipeline } from "node:stream/promises"
+import { ReadableStream as NodeReadableStream } from "node:stream/web"
 import * as os from "os"
 import * as path from "path"
 import * as tar from "tar"
+import { inspect } from "util"
 import { config } from "utils"
 import * as vscode from "vscode"
 import { ProgressLocation, window } from "vscode"
@@ -33,7 +36,13 @@ async function execAsync(command: string, options?: ExecOptions): Promise<ExecRe
 
 // simple util to normalize unknown errors
 function toError(e: unknown): Error {
-	return e instanceof Error ? e : new Error(String(e))
+	if (e instanceof Error) {
+		return e
+	}
+	if (typeof e === "string") {
+		return new Error(e)
+	}
+	return new Error(inspect(e))
 }
 
 interface GitHubAsset {
@@ -46,6 +55,11 @@ interface GitHubRelease {
 	prerelease: boolean
 	tag_name: string
 	assets: GitHubAsset[]
+}
+
+interface ReleaseAssetInfo {
+	url: string
+	version: string
 }
 
 function isGitHubAsset(value: unknown): value is GitHubAsset {
@@ -151,13 +165,13 @@ export async function installV(): Promise<void> {
 	const releaseChannel = config().get<string>("releaseChannel")
 	switch (releaseChannel) {
 		case "stable": {
-			const url = await getLatestStableAssetUrl()
-			await installVFromAsset(url)
+			const { url, version } = await getLatestStableAssetUrl()
+			await installVFromAsset(url, version)
 			return
 		}
 		case "nightly": {
-			const url = await getLatestAssetUrl()
-			await installVFromAsset(url)
+			const { url, version } = await getLatestAssetUrl()
+			await installVFromAsset(url, version)
 			return
 		}
 		case "custom":
@@ -254,7 +268,7 @@ export async function removeV(): Promise<void> {
 	}
 }
 
-export async function getLatestStableAssetUrl(): Promise<string> {
+export async function getLatestStableAssetUrl(): Promise<ReleaseAssetInfo> {
 	const res = await fetch("https://api.github.com/repos/vlang/v/releases", {
 		headers: { "User-Agent": "vscode-vlang-extension" },
 		redirect: "follow",
@@ -287,10 +301,13 @@ export async function getLatestStableAssetUrl(): Promise<string> {
 		throw new Error("No matching binary for this OS")
 	}
 
-	return asset.browser_download_url
+	return {
+		url: asset.browser_download_url,
+		version: stable.tag_name,
+	}
 }
 
-export async function getLatestAssetUrl(): Promise<string> {
+export async function getLatestAssetUrl(): Promise<ReleaseAssetInfo> {
 	const res = await fetch("https://api.github.com/repos/vlang/v/releases/latest", {
 		headers: { "User-Agent": "vscode-vlang-extension" },
 		redirect: "follow",
@@ -311,14 +328,21 @@ export async function getLatestAssetUrl(): Promise<string> {
 		throw new Error("No matching binary for this OS")
 	}
 
-	return asset.browser_download_url
+	return {
+		url: asset.browser_download_url,
+		version: parsed.tag_name,
+	}
 }
 
-export async function installVFromAsset(assetUrl: string): Promise<string> {
+export async function installVFromAsset(
+	assetUrl: string,
+	tagName: string,
+	isUpdate: boolean = false,
+): Promise<string> {
 	return await window.withProgress(
 		{
 			location: ProgressLocation.Notification,
-			title: "Installing V Language",
+			title: isUpdate ? "Updating V Language" : "Installing V Language",
 			cancellable: false,
 		},
 		async (progress) => {
@@ -388,8 +412,10 @@ export async function installVFromAsset(assetUrl: string): Promise<string> {
 			try {
 				const { installed, version } = await isVInstalled()
 				if (installed) {
-					const suffix = version ? ` (${version})` : ""
-					window.showInformationMessage(`V installed successfully${suffix}.`)
+					const suffix = version ? ` (${version})` : ` (${tagName})`
+					window.showInformationMessage(
+						`V ${isUpdate ? "updated" : "installed"} successfully${suffix}.`,
+					)
 				}
 			} catch (err: unknown) {
 				const error = toError(err)
@@ -412,7 +438,37 @@ async function downloadFile(url: string, dest: string): Promise<void> {
 		throw new Error(`Failed to download ${url}: ${res.status} ${res.statusText}`)
 	}
 
-	await pipeline(res.body, fs.createWriteStream(dest))
+	const nodeStream = Readable.fromWeb(res.body as unknown as NodeReadableStream)
+	await pipeline(nodeStream, fs.createWriteStream(dest))
+}
+
+async function updateNightlyBuild(): Promise<void> {
+	const vexec = getVExecCommand()
+	await window.withProgress(
+		{
+			location: ProgressLocation.Notification,
+			title: "Updating V Nightly",
+			cancellable: false,
+		},
+		async () => {
+			try {
+				const { stdout, stderr } = await execAsync(`${vexec} up`)
+				const combined = `${stdout}${stderr}`.trim()
+				const lines =
+					combined === ""
+						? []
+						: combined.split(/\r?\n/).filter((line) => line.trim() !== "")
+				const tail = lines.slice(-2).join("\n")
+				window.showInformationMessage(
+					tail !== "" ? tail : "V nightly build updated successfully.",
+				)
+			} catch (error: unknown) {
+				const err = toError(error)
+				log(`Failed to update nightly build: ${err.message}`)
+				window.showWarningMessage(`Failed to update V nightly build: ${err.message}`)
+			}
+		},
+	)
 }
 
 export async function handleVinstallation(): Promise<void> {
@@ -423,6 +479,7 @@ export async function handleVinstallation(): Promise<void> {
 	}
 
 	// Check for V only if it's not installed
+	const releaseChannel = config().get<string>("releaseChannel")
 	const { installed } = await isVInstalled()
 	if (!installed) {
 		const selection = await vscode.window.showInformationMessage(
@@ -435,5 +492,53 @@ export async function handleVinstallation(): Promise<void> {
 		if (selection === "Yes") {
 			await installV()
 		}
+	} else {
+		log("V is already installed, checking for updates.")
+		await checkUpdates(releaseChannel)
+	}
+}
+
+function extractVersionIdentifier(value: string | undefined): string | undefined {
+	if (!value) return undefined
+	const normalized = value.trim().toLowerCase()
+	if (normalized === "") return undefined
+	const weeklyMatch = normalized.match(/weekly\.\d{4}\.\d+/)
+	if (weeklyMatch) return weeklyMatch[0]
+	const semverMatch = normalized.match(/(\d+\.\d+\.\d+)/)
+	if (semverMatch) return semverMatch[1]
+	return normalized.replace(/^v[\s-]?/, "")
+}
+
+function isUpToDate(currentVersion: string | undefined, targetVersion: string): boolean {
+	const current = extractVersionIdentifier(currentVersion)
+	const target = extractVersionIdentifier(targetVersion)
+	if (!target) return false
+	if (!current) return false
+	return current === target
+}
+
+async function checkUpdates(releaseChannel: string | undefined): Promise<void> {
+	const channel = releaseChannel ?? "stable"
+	if (channel === "custom") {
+		log("Skipping auto-update for custom release channel.")
+		return
+	}
+
+	try {
+		if (channel === "nightly") {
+			await updateNightlyBuild()
+			return
+		}
+
+		const latest = await getLatestStableAssetUrl()
+		const { version: installedVersion } = await isVInstalled()
+		if (isUpToDate(installedVersion, latest.version)) {
+			log(`V is up to date (${latest.version}).`)
+			return
+		}
+		log(`Updating V to ${latest.version}.`)
+		await installVFromAsset(latest.url, latest.version, true)
+	} catch (error: unknown) {
+		log(`Failed to check or update V: ${toError(error).message}`)
 	}
 }
