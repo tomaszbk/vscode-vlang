@@ -1,11 +1,11 @@
 {
 	"name": "vscode-vlang",
 	"displayName": "V",
-	"description": "V language support (syntax highlighting, formatter, snippets) for Visual Studio Code.",
+	"description": "V language support with VLS, tasks, test coverage, syntax highlighting, and snippets for Visual Studio Code.",
 	"publisher": "vlanguage",
 	"icon": "icons/icon.png",
-	"version": "0.2.0",
-	"license": "MIT",
+	"version": "0.2.1",
+	"license": "GPL-2.0-only",
 	"engines": {
 		"vscode": "^1.105.0"
 	},
@@ -29,7 +29,9 @@
 		"lint": "eslint src --ext ts",
 		"lint:md": "markdownlint README.md",
 		"fmt": "prettier -w .",
-		"test": "npm run typecheck && npm run lint",
+		"test": "npm run typecheck && npm run lint && npm run test:logic",
+		"test:logic": "esbuild src/test/extension.test.ts src/test/testSkeleton.test.ts --bundle --platform=node --target=node24 --format=cjs --outdir=out/test && node --test out/test/extension.test.js out/test/testSkeleton.test.js",
+		"test:vscode": "npm run build && esbuild src/test/vscode.integration.ts --bundle --external:vscode --platform=node --target=node24 --format=cjs --outfile=out/test/vscode.integration.js && node scripts/test-vscode.cjs",
 		"vscode:prepublish": "npm run build:prod",
 		"package": "npm run build:prod && vsce package",
 		"test:grammar": "vscode-tmgrammar-test source.v -g syntaxes/v.tmLanguage.json  syntaxes/tests/*.v"
@@ -62,7 +64,9 @@
 				],
 				"extensions": [
 					".v",
-					".vsh"
+					".vsh",
+					".vh",
+					".vv"
 				],
 				"configuration": "language-configuration.json"
 			},
@@ -93,120 +97,92 @@
 			"type": "object",
 			"title": "V",
 			"properties": {
-				"v.releaseChannel": {
-					"type": "string",
-					"default": "stable",
-					"enum": [
-						"stable",
-						"nightly",
-						"custom"
-					],
-					"description": "Specify the V version to use",
-					"enumDescriptions": [
-						"Get the latest stable release of V. (Default)",
-						"Gets the latest development version of V.",
-						"Uses a custom version of V."
-					]
-				},
-				"v.buildPath": {
-					"type": "string",
-					"default": "",
-					"description": "Custom path to the V repo. Used only if 'v.releaseChannel' is set to 'custom'."
-				},
-				"v.forceCleanInstall": {
-					"scope": "resource",
-					"type": "boolean",
-					"default": false,
-					"description": "Removes any existing V installation and forces a clean install on startup."
-				},
 				"v.vls.command": {
 					"type": "string",
-					"default": "v",
-					"description": "Path to the V language server binary."
+					"default": "",
+					"description": "Path or command name for the V language server binary. If empty, the extension looks for `vls` in PATH."
 				},
 				"v.vls.args": {
 					"type": "array",
 					"default": [],
+					"items": {
+						"type": "string"
+					},
 					"description": "Arguments to pass to the V language server."
 				},
 				"v.executablePath": {
 					"scope": "resource",
 					"type": "string",
 					"default": "v",
-					"description": "Custom path to the V compiler executable (`v`).\nNOTE: Setting this won't change the VROOT path in VLS."
-				},
-				"v.vls.debug": {
-					"scope": "resource",
-					"type": "boolean",
-					"description": "Enables / disables the language server's debug mode.\nSetting it to true will create a log file to your workspace folder for bug reports."
+					"description": "Path or command name of the V compiler used by VLS and V build, run, and test tasks. Supports absolute paths, ~, ${env:NAME}, and ${workspaceFolder}."
 				},
 				"v.vls.enable": {
-					"scope": "resource",
-					"type": "boolean",
-					"default": false,
-					"description": "Enables the language server. (alpha)"
-				},
-				"v.vls.build": {
-					"scope": "resource",
 					"type": "boolean",
 					"default": true,
-					"description": "Automatically build VLS if it's not found. (Requires V to be installed)"
+					"description": "Enable the V language server."
 				},
-				"v.vls.forceCleanInstall": {
-					"scope": "resource",
+				"v.vls.inlayHints.enabled": {
 					"type": "boolean",
-					"default": false,
-					"description": "Removes any existing VLS binary and forces a clean install on startup or vls enabled."
+					"default": true,
+					"description": "Enable inlay hints from VLS."
 				},
-				"v.vls.buildPath": {
-					"scope": "resource",
-					"type": "string",
-					"default": "",
-					"description": "Path to vls source to build."
-				},
-				"v.vls.enableFeatures": {
-					"scope": "resource",
-					"type": "string",
-					"description": "Enables specific language server features. Multiple values must be separated with a comma (,)."
-				},
-				"v.vls.disableFeatures": {
-					"scope": "resource",
-					"type": "string",
-					"description": "Disables specific language server features. Multiple values must be separated with a comma (,)."
-				},
-				"v.vls.connectionMode": {
-					"scope": "resource",
-					"type": "string",
-					"default": "stdio",
-					"enum": [
-						"stdio",
-						"tcp"
-					],
-					"description": "Specify the mode to be used when connecting to VLS. (Only stdio is working currently)",
-					"enumDescriptions": [
-						"Connects to the language server via standard input/output. (Default)",
-						"Connects to the language server via TCP"
-					]
-				},
-				"v.vls.tcpMode.port": {
-					"scope": "resource",
-					"type": "number",
-					"default": 5007,
-					"description": "Port to be used when connecting to the language server. (Only in TCP mode)"
-				},
-				"v.vls.tcpMode.useRemoteServer": {
-					"scope": "resource",
-					"default": false,
+				"v.vls.diagnostics": {
 					"type": "boolean",
-					"description": "Connect to a remote server instead of launching a new local process. (Only in TCP mode)"
+					"default": true,
+					"description": "Enable live diagnostics from VLS."
 				},
-				"v.vls.customArgs": {
+				"v.vls.coverage.enabled": {
+					"type": "boolean",
+					"default": true,
 					"scope": "resource",
-					"type": "string",
-					"description": "Custom arguments to be passed to the VLS executable."
+					"description": "Collect test coverage and highlight covered and uncovered executable lines after V test tasks."
 				}
 			}
 		},
+		"taskDefinitions": [
+			{
+				"type": "v",
+				"required": [
+					"action"
+				],
+				"properties": {
+					"action": {
+						"type": "string",
+						"description": "The V operation to run.",
+						"enum": [
+							"build",
+							"run",
+							"test"
+						],
+						"enumDescriptions": [
+							"Build the workspace with v .",
+							"Run the workspace with v run .",
+							"Test the workspace with v test ."
+						]
+					}
+				}
+			}
+		],
+		"problemMatchers": [
+			{
+				"name": "vls",
+				"label": "V compiler diagnostics",
+				"owner": "v",
+				"severity": "info",
+				"fileLocation": [
+					"autoDetect",
+					"${workspaceFolder}"
+				],
+				"pattern": {
+					"regexp": "^(.*):(\\d+):(\\d+):\\s*(error|warning|notice):\\s*(.*)$",
+					"file": 1,
+					"line": 2,
+					"column": 3,
+					"severity": 4,
+					"message": 5
+				}
+			}
+		],
 		"configurationDefaults": {
 			"[v]": {
 				"editor.insertSpaces": false
@@ -220,6 +196,26 @@
 		],
 		"commands": [
 			{
+				"command": "vls.build",
+				"title": "Build",
+				"category": "V"
+			},
+			{
+				"command": "vls.run",
+				"title": "Run",
+				"category": "V"
+			},
+			{
+				"command": "vls.test",
+				"title": "Test",
+				"category": "V"
+			},
+			{
+				"command": "vls.coverage.clear",
+				"title": "Clear Test Coverage",
+				"category": "V"
+			},
+			{
 				"command": "v.run",
 				"title": "Run current file",
 				"category": "V"
@@ -232,6 +228,11 @@
 			{
 				"command": "v.prod",
 				"title": "Build an optimized executable from current file",
+				"category": "V"
+			},
+			{
+				"command": "v.generateTestFile",
+				"title": "Generate Test File",
 				"category": "V"
 			},
 			{
@@ -277,19 +278,20 @@
 		]
 	},
 	"activationEvents": [
-		"workspaceContains:**/*.v"
+		"workspaceContains:**/*.v",
+		"onLanguage:v",
+		"onTaskType:v"
 	],
 	"main": "./out/extension.js",
 	"dependencies": {
-		"extract-zip": "^2.0.1",
-		"tar": "^7.5.1",
-		"vscode-languageclient": "10.0.0-next.15"
+		"vscode-languageclient": "10.1.0"
 	},
 	"devDependencies": {
 		"@types/node": "24",
 		"@types/vscode": "1.105.0",
 		"@typescript-eslint/eslint-plugin": "^8.46",
 		"@typescript-eslint/parser": "^8.46",
+		"@vscode/test-electron": "^3.1.0",
 		"@vscode/vsce": "^3.6.2",
 		"esbuild": "^0.25.10",
 		"eslint": "^9.37.0",
